@@ -587,7 +587,8 @@ s32 ms9132_get_edid(struct usb_device* udev, misctiming_t* timing, u8 detail_cou
 
         ret = ms9132_read_xdata(udev, addr, buf, (u16)len);
     }
-
+    //@Perry, alway read edid from xdata to update detailed timing
+    ret = ms9132_read_xdata(udev, addr, buf, (u16)len);
     edid_update_detailed_timing(buf, timing, detail_count, block);
 
     return ret;
