@@ -259,18 +259,17 @@ static bool usb_hal_compare_line(u8* buffer_a, u8* buffer_b, int step, int len)
 
 static void usb_hal_combine_rects(struct usb_hal_dev* usb_dev, int left, int top, int right, int bottom)
 {
-	int i;
-	for (i = 0; i < 2; i++) {
-		usb_dev->rect[i].left = min(usb_dev->rect[i].left, left);
-		usb_dev->rect[i].top = min(usb_dev->rect[i].top, top);
-		usb_dev->rect[i].right = max(usb_dev->rect[i].right, right);
-		usb_dev->rect[i].bottom =  max(usb_dev->rect[i].bottom, bottom);
+	int i = usb_dev->frame_index;
+	
+	usb_dev->rect[i].left = min(usb_dev->rect[i].left, left);
+	usb_dev->rect[i].top = min(usb_dev->rect[i].top, top);
+	usb_dev->rect[i].right = max(usb_dev->rect[i].right, right);
+	usb_dev->rect[i].bottom =  max(usb_dev->rect[i].bottom, bottom);
 
-		usb_dev->rect[i].left &= 0xFFC;
-		usb_dev->rect[i].right = (usb_dev->rect[i].right + 3) & 0xFFC;
-		usb_dev->rect[i].top &= 0xFFE;
-		usb_dev->rect[i].bottom = (usb_dev->rect[i].bottom + 1) & 0xFFE;
-	}
+	usb_dev->rect[i].left &= 0xFFC;
+	usb_dev->rect[i].right = (usb_dev->rect[i].right + 3) & 0xFFC;
+	usb_dev->rect[i].top &= 0xFFE;
+	usb_dev->rect[i].bottom = (usb_dev->rect[i].bottom + 1) & 0xFFE;
 }
 
 static void usb_hal_update_change_rects(struct usb_hal_dev* usb_dev)
@@ -341,22 +340,6 @@ static void usb_hal_update_change_rects(struct usb_hal_dev* usb_dev)
 		p_new -= 4;
 	}
 
-	//update buffer
-	if (left == 0 && right == width) {
-		p_old = usb_dev->image_buf.buf + top * line_stride;
-		p_new = usb_dev->desktop_buf.buf + top * line_stride;
-		memcpy(p_old, p_new, (bottom - top) * line_stride);
-	} else {
-		bytesperline = (right - left) * 4;
-		p_old = usb_dev->image_buf.buf + top * line_stride + left * 4;
-		p_new = usb_dev->desktop_buf.buf + top * line_stride + left * 4;
-		for (row = top; row < bottom; row++) {
-			memcpy(p_old, p_new, bytesperline);
-			p_old += line_stride;
-			p_new += line_stride;
-		}
-	}
-
 	usb_hal_combine_rects(usb_dev, left, top, right, bottom);
 }
 
@@ -424,6 +407,31 @@ static int usb_hal_dev_send_frame(struct usb_hal_dev* usb_dev, struct urb* data_
 		real_ret = ret;
 	} else {
 		usb_dev->stat.send_success++;
+		
+		// Now that frame is sent successfully, update image_buf to match what we sent
+		int left = usb_dev->rect[usb_dev->frame_index].left;
+		int top = usb_dev->rect[usb_dev->frame_index].top;
+		int right = usb_dev->rect[usb_dev->frame_index].right;
+		int bottom = usb_dev->rect[usb_dev->frame_index].bottom;
+		int line_stride = usb_dev->mode.width * 4;
+		
+		mutex_lock(&usb_dev->usb_buf.mutex);
+		if (left == 0 && right == usb_dev->mode.width) {
+			u8* p_old = usb_dev->image_buf.buf + top * line_stride;
+			u8* p_new = usb_dev->desktop_buf.buf + top * line_stride;
+			memcpy(p_old, p_new, (bottom - top) * line_stride);
+		} else {
+			int row;
+			int bytesperline = (right - left) * 4;
+			u8* p_old = usb_dev->image_buf.buf + top * line_stride + left * 4;
+			u8* p_new = usb_dev->desktop_buf.buf + top * line_stride + left * 4;
+			for (row = top; row < bottom; row++) {
+				memcpy(p_old, p_new, bytesperline);
+				p_old += line_stride;
+				p_new += line_stride;
+			}
+		}
+		mutex_unlock(&usb_dev->usb_buf.mutex);
 	}
 
     ret = usb_bulk_msg(udev, usb_sndbulkpipe(udev, ep), zero_msg, 0, &snd_len, 2000);
