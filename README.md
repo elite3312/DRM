@@ -22,13 +22,17 @@ Key issues fixed:
    of only the current frame's buffer, causing stale regions to persist
    across frames.
 
-3. Cursor operations had ordering issues - change detection happened
-   after cursor blending, contaminating image_buf with cursor pixels.
-
-4. Race condition on update_time timestamp access without proper
-   memory barriers.
 
 Solution: Defer image_buf updates until after successful USB transmission,
 ensuring it always reflects what's actually displayed on hardware. Only
-update the current frame's dirty rectangle, and detect changes before
-cursor compositing.
+update the current frame's dirty rectangle.
+
+## build
+
+only tested on ubuntu 22.04 with kernel 5.15.
+
+```sh
+sudo insmod ./drm/usbdisp_drm.ko
+sudo insmod ./drm/usbdisp_usb.ko
+sudo systemctl restart display-manager
+```
