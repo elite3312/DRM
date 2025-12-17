@@ -63,6 +63,7 @@ struct drm_device* msdisp_drm_get_free_device(void)
     struct msdisp_drm_device* msdisp_drm;
 
     for (i = 0; i < MSDISP_DEVICE_COUNT_MAX; i++) {
+         printk("@Perry:msdisp_drm_get_free_device() drm device %d\n", i);//only appeared once
          pdev = msdisp_platform_get_device(i);
          if (!pdev) {
             continue;
@@ -73,6 +74,7 @@ struct drm_device* msdisp_drm_get_free_device(void)
          }
          msdisp_drm = to_msdisp_drm(drm);
          if (has_free_pipeline(msdisp_drm)) {
+            printk("@Perry:msdisp_drm_get_free_device() found drm device %d\n", i);//only appeared once
             return drm;
          }
     }
