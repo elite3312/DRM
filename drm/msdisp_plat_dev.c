@@ -67,7 +67,7 @@ int msdisp_platform_device_probe(struct platform_device *pdev)
 	pdev->dev.archdata.iommu = INTEL_IOMMU_DUMMY_DOMAIN;
 #endif
 #endif
-
+	printk("@Perry:msdisp_platform_device_probe() called\n");
 	dev = msdisp_drm_device_create(&pdev->dev);
 	if (IS_ERR_OR_NULL(dev))
 		goto err_free;
