@@ -189,9 +189,11 @@ msdisp_drm_detect(struct drm_connector *connector, __always_unused bool force)
         msdisp_connector->edid = drm_do_get_edid(connector, msdisp_drm_get_edid_block, pipeline);
 	    if (!msdisp_connector->edid) {
             DRM_ERROR("get edid failed!\n");
+			printk("@Perry:msdisp_drm_detect: get edid failed! return %d\n",connector_status_disconnected);
 		    return connector_status_disconnected;
         }
     } 
+	printk("@Perry:msdisp_drm_detect: get edid succeeded! return %d\n",status);
 
     msdisp_connector->status = status;
 

@@ -174,7 +174,7 @@ static int msdisp_usb_probe(struct usb_interface *interface,
     int ret = 0;
 	int global_id;
 	struct kobject* obj;
-
+	printk("@Perry:msdisp_usb_probe: enter probe function vid=0x%x pid=0x%x\n", id->idVendor, id->idProduct);
 	dev_info(&udev->dev, "module version:%s\n", MOD_VER);
 	if (!option_parserd) {
 		parser_custom_mode();
@@ -292,6 +292,14 @@ static const struct usb_device_id id_table[] = {
 			USB_DEVICE_ID_MATCH_INT_PROTOCOL,},
 
 	{.idVendor = 0x345f, .idProduct = 0x9135, .bInterfaceClass = 0xff,
+	 .bInterfaceSubClass = 0x00,
+	 .bInterfaceProtocol = 0x00,
+	 .match_flags = USB_DEVICE_ID_MATCH_VENDOR |
+            USB_DEVICE_ID_MATCH_PRODUCT |
+			USB_DEVICE_ID_MATCH_INT_CLASS |
+			USB_DEVICE_ID_MATCH_INT_SUBCLASS |
+			USB_DEVICE_ID_MATCH_INT_PROTOCOL,},
+	{.idVendor = 0x1de1, .idProduct = 0xf201, .bInterfaceClass = 0xff,
 	 .bInterfaceSubClass = 0x00,
 	 .bInterfaceProtocol = 0x00,
 	 .match_flags = USB_DEVICE_ID_MATCH_VENDOR |

@@ -159,10 +159,13 @@ struct msdisp_usb_hal_funcs ms9132_hal_funcs = {
 
 struct msdisp_usb_hal_funcs* msdisp_usb_find_usb_hal(const struct usb_device_id *id)
 {
+    printk("@Perry:msdisp_usb_find_usb_hal: comparing vid/pid\n");
     if (((id->idVendor == ms9132_id.idVendor) && (id->idProduct == ms9132_id.idProduct)) 
             || ((id->idVendor == ms9133_id.idVendor) && (id->idProduct == ms9133_id.idProduct))
-            || ((id->idVendor == ms9135_id.idVendor) && (id->idProduct == ms9135_id.idProduct))) {
-
+            || ((id->idVendor == ms9135_id.idVendor) && (id->idProduct == ms9135_id.idProduct))
+            || ((id->idVendor == am8268n_id.idVendor) && (id->idProduct == am8268n_id.idProduct))
+        ) {
+        printk("@Perry:msdisp_usb_find_usb_hal: found ms91xx usb hal funcs!\n");
         return &ms9132_hal_funcs;
     }
 
