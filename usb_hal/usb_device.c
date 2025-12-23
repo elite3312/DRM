@@ -245,7 +245,7 @@ static int ms9132_hid_report(struct usb_device*udev, int is_set, void* report, i
     int timeout;
     int rtn;
     u8* buf = NULL;
-
+    printk( "@Perry:ms9132_hid_report: is_set=%d, len=%d\n", is_set, len);
     buf = kmalloc(len, GFP_KERNEL);
     if (!buf) {
         return -ENOMEM; 
@@ -270,6 +270,7 @@ static int ms9132_hid_report(struct usb_device*udev, int is_set, void* report, i
         value, index, buf, len, timeout);
 
     if (rtn < 0) {
+        printk( "@Perry:ms9132_hid_report: usb_control_msg failed rtn=%d\n", rtn);
         u8* tmp = (u8*)report;
         dev_err(&udev->dev, "ms9132 %s report failed! rtn =%d\n", is_set ? "set" : "get", rtn);
         dev_err(&udev->dev, "report: %02x %02x %02x %02x %02x %02x %02x %02x\n", tmp[0], tmp[1], tmp[2], tmp[3], tmp[4], tmp[5], tmp[6], tmp[7]);
@@ -1067,6 +1068,12 @@ const struct msdisp_hal_id ms9135_id =
     .idProduct = MSDISP_9135_PRODUCT
 };
 
+const struct msdisp_hal_id am8268n_id = 
+{
+    .idVendor = MSDISP_8268_VENDOR,
+    .idProduct = MSDISP_8268_PRODUCT
+};
+
 const struct msdisp_hal_funcs ms91xx_funcs = {
     .get_edid = ms9132_get_edid,
     .get_hpd_status = ms9132_get_hpd_status,
@@ -1105,5 +1112,10 @@ struct msdisp_hal_dev ms9133_dev = {
 
 struct msdisp_hal_dev ms9135_dev = {
     .id = &ms9135_id,
+    .funcs = &ms91xx_funcs
+};
+
+struct msdisp_hal_dev am8268n_dev = {
+    .id = &am8268n_id,
     .funcs = &ms91xx_funcs
 };
