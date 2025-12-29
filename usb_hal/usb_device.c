@@ -31,6 +31,8 @@
 
 #define MS9132_TRNAS_BULK_EP                    4
 
+#define AM8268N_TRNAS_BULK_EP                    5
+
 #define MS9132_EDID_BLOCK_LEN                   0x80
 
 #define MS9132_REQUEST_TYPE_SET                 (USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE)
@@ -245,7 +247,7 @@ static int ms9132_hid_report(struct usb_device*udev, int is_set, void* report, i
     int timeout;
     int rtn;
     u8* buf = NULL;
-    printk( "@Perry:ms9132_hid_report: is_set=%d, len=%d\n", is_set, len);
+    //printk( "@Perry:ms9132_hid_report: is_set=%d, len=%d\n", is_set, len);
     buf = kmalloc(len, GFP_KERNEL);
     if (!buf) {
         return -ENOMEM; 
@@ -270,7 +272,7 @@ static int ms9132_hid_report(struct usb_device*udev, int is_set, void* report, i
         value, index, buf, len, timeout);
 
     if (rtn < 0) {
-        printk( "@Perry:ms9132_hid_report: usb_control_msg failed rtn=%d\n", rtn);
+        //printk( "@Perry:ms9132_hid_report: usb_control_msg failed rtn=%d\n", rtn);
         u8* tmp = (u8*)report;
         dev_err(&udev->dev, "ms9132 %s report failed! rtn =%d\n", is_set ? "set" : "get", rtn);
         dev_err(&udev->dev, "report: %02x %02x %02x %02x %02x %02x %02x %02x\n", tmp[0], tmp[1], tmp[2], tmp[3], tmp[4], tmp[5], tmp[6], tmp[7]);
@@ -558,7 +560,7 @@ s32 ms9132_get_edid(struct usb_device* udev, misctiming_t* timing, u8 detail_cou
     u8 chip_id, u8 port_type, u8 sdram_type, u8 block, u8* buf, u32 len)
 {
     s32 ret = 0;
-
+    printk("@Perry: ms9132_get_edid: port_type=%d, sdram_type=%d, block=%d, len=%d\n", port_type, sdram_type, block, len);
     if ((VIDEO_PORT_YPBPR == port_type) || (VIDEO_PORT_CVBS == port_type) || (VIDEO_PORT_CVBS_SVIDEO == port_type) || (VIDEO_PORT_SVIDEO == port_type)) {
         if (block > 0 ) {
             dev_err(&udev->dev, "video output type %d has only one block!\n", port_type);
@@ -585,18 +587,64 @@ s32 ms9132_get_edid(struct usb_device* udev, misctiming_t* timing, u8 detail_cou
         }
     } else {
         u16 addr = MS9132_XDATA_REG_EDID + block * MS9132_EDID_BLOCK_LEN;
-
         ret = ms9132_read_xdata(udev, addr, buf, (u16)len);
+
+        // Hardcode EDID workaround for specific device if read fails
+        if (ret && udev->descriptor.idVendor == 0x1de1 && udev->descriptor.idProduct == 0xf201) {
+            if (block == 0 && len >= 128) {
+                // Block 0 from user log
+                const u8 edid_block0[128] = {
+                    0x00,0xff,0xff,0xff,0xff,0xff,0xff,0x00,0x41,0x0c,0xd2,0xc0,0x31,0x9b,0x00,0x00,
+                    0x01,0x1c,0x01,0x03,0x80,0x3c,0x22,0x78,0x2a,0x2f,0xa5,0xa5,0x54,0x50,0x9e,0x27,
+                    0x10,0x50,0x54,0xbd,0x4b,0x00,0xd1,0xc0,0x95,0x00,0x95,0x0f,0xb3,0x00,0x81,0xc0,
+                    0x81,0x80,0x81,0x40,0x01,0x01,0x02,0x3a,0x80,0x18,0x71,0x38,0x2d,0x40,0x58,0x2c,
+                    0x45,0x00,0x56,0x50,0x21,0x00,0x00,0x1e,0x00,0x00,0x00,0xff,0x00,0x55,0x4b,0x35,
+                    0x31,0x38,0x30,0x31,0x30,0x33,0x39,0x37,0x32,0x39,0x00,0x00,0x00,0xfc,0x00,0x50,
+                    0x48,0x4c,0x20,0x32,0x37,0x33,0x56,0x35,0x0a,0x20,0x20,0x20,0x00,0x00,0x00,0xfd,
+                    0x00,0x38,0x4c,0x1e,0x53,0x11,0x00,0x0a,0x20,0x20,0x20,0x20,0x20,0x20,0x01,0xc7
+                };
+                memcpy(buf, edid_block0, 128);
+                ret = 0;
+            } else if (block == 1 && len >= 128) {
+                // Block 1 from user log
+                const u8 edid_block1[128] = {
+                    0x02,0x03,0x22,0xf1,0x4f,0x01,0x02,0x03,0x05,0x06,0x07,0x10,0x11,0x12,0x13,0x14,
+                    0x15,0x16,0x1f,0x04,0x23,0x09,0x17,0x07,0x83,0x01,0x00,0x00,0x65,0x03,0x0c,0x00,
+                    0x10,0x00,0x02,0x3a,0x80,0x18,0x71,0x38,0x2d,0x40,0x58,0x2c,0x45,0x00,0x56,0x50,
+                    0x21,0x00,0x00,0x1e,0x8c,0x0a,0xd0,0x8a,0x20,0xe0,0x2d,0x10,0x10,0x3e,0x96,0x00,
+                    0x56,0x50,0x21,0x00,0x00,0x18,0x01,0x1d,0x00,0x72,0x51,0xd0,0x1e,0x20,0x6e,0x28,
+                    0x55,0x00,0x56,0x50,0x21,0x00,0x00,0x1e,0x8c,0x0a,0xd0,0x90,0x20,0x40,0x31,0x20,
+                    0x0c,0x40,0x55,0x00,0x56,0x50,0x21,0x00,0x00,0x18,0x00,0x00,0x00,0x00,0x00,0x00,
+                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x19
+                };
+                memcpy(buf, edid_block1, 128);
+                ret = 0;
+            }
+        }
     }
     //@Perry, alway read edid from xdata to update detailed timing
     //u16 addr = MS9132_XDATA_REG_EDID + block * MS9132_EDID_BLOCK_LEN;
     //ret = ms9132_read_xdata(udev, addr, buf, (u16)len);
+
+    printk("@Perry buf before update detailed timing:\n");
+    int i = 0;
+    for (; i < 128; i += 16) {
+        printk("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+            buf[i], buf[i+1], buf[i+2], buf[i+3], buf[i+4], buf[i+5], buf[i+6], buf[i+7],
+            buf[i+8], buf[i+9], buf[i+10], buf[i+11], buf[i+12], buf[i+13], buf[i+14], buf[i+15]);
+    }
     edid_update_detailed_timing(buf, timing, detail_count, block);
 
     return ret;
 }
 
-
+s32 am8268n_get_hpd_status(struct usb_device* udev, u32* status)
+{
+    int rtn;
+    rtn = 0;
+    *status = 1;
+    return rtn;
+}
 s32 ms9132_get_hpd_status(struct usb_device* udev, u32* status)
 {
     int rtn;
@@ -812,6 +860,10 @@ u8 ms9132_get_trans_bulk_ep(void)
     return (u8)MS9132_TRNAS_BULK_EP;
 }
 
+u8 am8268n_get_trans_bulk_ep(void)
+{
+    return (u8)AM8268N_TRNAS_BULK_EP;
+}
 s32 ms9132_xdata_write_byte(struct usb_device* udev, u16 addr, u8 data)
 {
     struct ms9132_hid_write_data_byte wdata;
@@ -968,6 +1020,12 @@ static s32 ms9132_event_proc(struct usb_device* udev, struct usb_hal_event* even
 
 static s32 ms91xx_get_port_type(struct usb_device* udev, u8* port_type)
 {
+    /*@Perry, for AM8268N, hardcode the port type to HDMI*/
+    if ((udev->descriptor.idVendor == MSDISP_8268_VENDOR) && (udev->descriptor.idProduct == MSDISP_8268_PRODUCT)) {
+        *port_type = VIDEO_PORT_HDMI;
+        return 0;
+    }
+    /*@Perry, end*/
     s32 ret;
     u8 reg = 0;
 
@@ -978,12 +1036,17 @@ static s32 ms91xx_get_port_type(struct usb_device* udev, u8* port_type)
         }
         *port_type = reg;
     }
-
+    printk("ms91xx_get_port_type: port_type=%d\n", *port_type);
     return ret;
 }
 
 static s32 ms91xx_get_sdram_type(struct usb_device* udev, u8* sdram_type)
 {
+    //@Perry, for AM8268N, hardcode the sdram type to SDRAM_NONE
+    if ((udev->descriptor.idVendor == MSDISP_8268_VENDOR) && (udev->descriptor.idProduct == MSDISP_8268_PRODUCT)) {
+        *sdram_type = SDRAM_8M;
+        return 0;
+    }
     s32 ret;
     u8 reg = 0;
 
@@ -994,12 +1057,18 @@ static s32 ms91xx_get_sdram_type(struct usb_device* udev, u8* sdram_type)
         }
         *sdram_type = reg;
     }
-
+    printk("ms91xx_get_sdram_type: sdram_type=%d\n", *sdram_type);
     return ret;
 }
 
 static int ms91xx_get_chip_id(struct usb_device* udev, u8* chip_id)
 {
+    //@Perry, hardcode the chip id to CHIP_ID_9132 for AM8268N
+    if ((udev->descriptor.idVendor == MSDISP_8268_VENDOR) && (udev->descriptor.idProduct == MSDISP_8268_PRODUCT)) {
+        *chip_id = CHIP_ID_9132;
+        return 0;
+    }
+    //@Perry, end
     u8 buf[3] = {0, 0, 0};
     s32 ret;
 
@@ -1028,7 +1097,7 @@ static int ms91xx_get_chip_id(struct usb_device* udev, u8* chip_id)
             *chip_id = CHIP_ID_9120;
         }
     }
-
+    printk("ms91xx_get_chip_id: chip_id=%d\n", *chip_id);
     return 0;
 }
 
@@ -1100,6 +1169,32 @@ const struct msdisp_hal_funcs ms91xx_funcs = {
     .init_dev = ms91xx_init_dev
 };
 
+const struct msdisp_hal_funcs am8268n_funcs = {
+    .get_edid = ms9132_get_edid,
+    .get_hpd_status = am8268n_get_hpd_status,
+    .set_video_in_info = ms9132_set_video_in_info,
+    .set_video_out_info = ms9132_set_video_out_info,
+    .trigger_frame = ms9132_trigger_frame,
+    .set_trans_mode = ms9132_set_trans_mode,
+    .set_trans_enable = ms9132_set_trans_enable,
+    .set_video_enable = ms9132_set_video_enable,
+    .set_power_enable = ms9132_set_power_enable,
+    .get_mode_vic = ms9132_get_mode_vic,
+    .get_transfer_bulk_ep = am8268n_get_trans_bulk_ep,
+    .xdata_write_byte = ms9132_xdata_write_byte,
+    .xdata_read_byte = ms9132_xdata_read_byte,
+    .current_frame_index = ms9132_current_frame_index,
+    .set_screen_enable = ms9132_set_screen_enable,
+    .event_proc = ms9132_event_proc,
+    .get_chip_id= ms91xx_get_chip_id,
+    .get_port_type = ms91xx_get_port_type,
+    .get_sdram_type = ms91xx_get_sdram_type,
+    .read_flash = ms91xx_read_flash,
+    .sfr_read_byte = ms91xx_read_sfr,
+    .sfr_write_byte = ms91xx_write_sfr,
+    .init_dev = ms91xx_init_dev
+};
+
 struct msdisp_hal_dev ms9132_dev = {
     .id = &ms9132_id,
     .funcs = &ms91xx_funcs
@@ -1117,5 +1212,5 @@ struct msdisp_hal_dev ms9135_dev = {
 
 struct msdisp_hal_dev am8268n_dev = {
     .id = &am8268n_id,
-    .funcs = &ms91xx_funcs
+    .funcs = &am8268n_funcs
 };

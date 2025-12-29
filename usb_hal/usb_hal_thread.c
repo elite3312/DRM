@@ -402,6 +402,7 @@ static int usb_hal_dev_send_frame(struct usb_hal_dev* usb_dev, struct urb* data_
 	}
 
 	ret = usb_hal_start_wait_urb(data_urb, 2000, &snd_len);
+	printk("@Perry:usb_hal_dev_send_frame: usb_hal_start_wait_urb ret=%d, snd_len=%d\n", ret, snd_len);
 	if (ret) {
 		dev_err(&udev->dev, "wait urb failed!\n ret = %d\n", ret);
 		real_ret = ret;
@@ -502,12 +503,12 @@ static void usb_hal_dev_do_update(struct usb_hal_dev* usb_dev, struct urb* data_
 
 	usb_dev->stat.update_event++;
 	usb_dev->wait_send_cnt = 0;
-
+	//printk("@Perry:usb_hal_dev_do_update: start to send frame!\n");
 	ret = usb_hal_dev_send_frame(usb_dev, data_urb, zero_msg, ep);
 	if (ret) {
 		goto out;
 	}
-
+	//printk("@Perry:usb_hal_dev_do_update: send frame success!\n");
 	if (0 == usb_dev->first_buf_send) {
 		struct usb_hal* hal = usb_dev->hal;
 		ret = hal_dev->funcs->set_video_enable(udev, 1);
@@ -566,11 +567,13 @@ void usb_hal_state_machine(struct usb_hal_dev* usb_dev, struct urb* data_urb, un
 	ktime_t current_time;
 
     ret = down_timeout(&usb_dev->sema, 1);
+	//printk("@Perry:down_timeout ret=%d\n", ret);//@Perry:down_timeout ret=-62
     // if usb will be suspend, not process, until usb resume
 	if ( MS9132_USB_BUS_STATUS_SUSPEND == usb_dev->bus_status) {
 		return;
 	}
-
+	//printk("@Perry:usb_hal_state_machine: bus status=%d\n", usb_dev->bus_status);
+	//[  106.969122] @Perry:usb_hal_state_machine: bus status=0
 	// event received, proc event
     if (!ret) {
         while ((len = kfifo_out(fifo, &event, sizeof(event)) != 0)) {
@@ -640,6 +643,7 @@ int usb_hal_state_machine_entry(void* data)
 	}
 
     ep = usb_dev->hal_dev->funcs->get_transfer_bulk_ep();
+	printk("@Perry:bulk transfer ep:0x%x\n", ep);//4
 	/* wait for drm enable */
     while(usb_dev->thread_run_flag) {
         usb_hal_state_machine(usb_dev, data_urb, zero_msg, ep, fifo);		

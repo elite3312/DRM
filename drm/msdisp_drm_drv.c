@@ -169,7 +169,7 @@ static int msdisp_drm_init(struct msdisp_drm_device *msdisp)
 	struct drm_device *dev = &msdisp->drm;
 	int i;
 	int ret = -ENOMEM;
-
+	printk("@Perry:msdisp_drm_init() called\n");
 	for (i = 0; i < msdisp->pipeline_cnt; i++) {
 		msdisp->pipeline[i].drm_status = MSDISP_DRM_STATUS_DISABLE;
 		mutex_init(&msdisp->pipeline[i].hal_lock);
@@ -261,7 +261,7 @@ struct drm_device *msdisp_drm_device_create(struct device *parent)
     struct msdisp_drm_device *msdisp_drm = NULL;
 	struct drm_device *drm = NULL;
 	int ret, i, alloc_fifo_cnt = 0;
-
+	printk("@Perry:msdisp_drm_device_create() called\n");
 	if (msdisp_drm_initial_pipeline_count > MSDISP_DRM_MAX_PIPELINE_CNT) {
 		printk("%s: Max pipeline is :%d module param is:%d\n", __func__, MSDISP_DRM_MAX_PIPELINE_CNT, msdisp_drm_initial_pipeline_count);
 		return NULL;

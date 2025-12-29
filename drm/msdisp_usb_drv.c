@@ -222,7 +222,7 @@ static int msdisp_usb_probe(struct usb_interface *interface,
         goto fail;
     }
 
-	usb_set_intfdata(interface, usb_dev);
+	usb_set_intfdata(interface, usb_dev);/* save our data pointer in this interface device */
 	global_id = msdisp_drm_get_pipeline_global_id(usb_dev->drm, usb_dev->pipeline_index);
 	usb_dev->hal = usb_hal_init(interface, id, fifo, global_id);
 	if (!usb_dev->hal) {

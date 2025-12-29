@@ -40,7 +40,7 @@ int ms9132_hal_get_edid(struct msdisp_usb_hal* usb_hal, int block, unsigned char
 {
     struct msdisp_usb_device* msdisp_usb = (struct msdisp_usb_device *)usb_hal->private;
     struct usb_hal* hal = msdisp_usb->hal;
-
+    printk("@Perry:ms9132_hal_get_edid: start to get edid block %d\n", block);
     return usb_hal_get_edid(hal, block, buf, len);
 }
 

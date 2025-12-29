@@ -96,6 +96,7 @@ int usb_hal_get_edid(struct usb_hal* hal, int block, u8* buf, u32 len)
     }
 
     usb_dev = (struct usb_hal_dev*)hal->private;
+    printk("@Perry:usb_hal_get_edid: start to get edid block %d\n", block);
     return usb_dev->hal_dev->funcs->get_edid(usb_dev->udev, hal->misc_timing, hal->detail_count,
         hal->chip_id, hal->port_type, hal->sdram_type, block, buf, len);
 }
