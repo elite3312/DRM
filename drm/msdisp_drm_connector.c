@@ -159,25 +159,25 @@ msdisp_drm_detect(struct drm_connector *connector, __always_unused bool force)
 				container_of(connector,
 				struct msdisp_drm_connector,
 				connector);
-	printk("@Perry:msdisp_drm_detect() called for pipeline index %d\n", msdisp_connector->pipeline_index);
+	//printk("@Perry:msdisp_drm_detect() called for pipeline index %d\n", msdisp_connector->pipeline_index);
 	pipeline = &msdisp_drm->pipeline[msdisp_connector->pipeline_index];
-	printk("@Perry:msdisp_drm_detect: pipeline ptr=%p\n", pipeline);
+	//printk("@Perry:msdisp_drm_detect: pipeline ptr=%p\n", pipeline);
 	mutex_lock(&pipeline->hal_lock);
 	usb_hal = pipeline->usb_hal;
-	printk("@Perry:msdisp_drm_detect: usb_hal ptr=%p\n", usb_hal);
+	//printk("@Perry:msdisp_drm_detect: usb_hal ptr=%p\n", usb_hal);
 	if (!usb_hal) {
-		printk("@Perry:msdisp_drm_detect: usb_hal is NULL, setting status=disconnected\n");
+		//printk("@Perry:msdisp_drm_detect: usb_hal is NULL, setting status=disconnected\n");
 		status = connector_status_disconnected;
 	} else {
-		printk("@Perry:msdisp_drm_detect: calling get_hpd_status, usb_hal ptr=%p\n", usb_hal);
+		//printk("@Perry:msdisp_drm_detect: calling get_hpd_status, usb_hal ptr=%p\n", usb_hal);
 		rtn = usb_hal->funcs->get_hpd_status(usb_hal, &stat);
-		printk("@Perry:msdisp_drm_detect: get_hpd_status rtn=%d, stat=%u\n", rtn, stat);
+		//printk("@Perry:msdisp_drm_detect: get_hpd_status rtn=%d, stat=%u\n", rtn, stat);
 		if (rtn) {
-			printk("@Perry:msdisp_drm_detect: get_hpd_status failed, setting status=disconnected\n");
+			//printk("@Perry:msdisp_drm_detect: get_hpd_status failed, setting status=disconnected\n");
 			status = connector_status_disconnected;
 		} else {
 			status = stat ? connector_status_connected : connector_status_disconnected;
-			printk("@Perry:msdisp_drm_detect: stat=%u, setting status=%d\n", stat, status);
+			//printk("@Perry:msdisp_drm_detect: stat=%u, setting status=%d\n", stat, status);
 		}
 	}
 	mutex_unlock(&pipeline->hal_lock);
@@ -186,23 +186,23 @@ msdisp_drm_detect(struct drm_connector *connector, __always_unused bool force)
         dev_info(connector->dev->dev, "status changed! old:%d new:%d\n", msdisp_connector->status, status);
     }
 
-	printk("@Perry:msdisp_drm_detect: status before EDID block: old=%d new=%d, edid ptr=%p\n", msdisp_connector->status, status, msdisp_connector->edid);
+	//printk("@Perry:msdisp_drm_detect: status before EDID block: old=%d new=%d, edid ptr=%p\n", msdisp_connector->status, status, msdisp_connector->edid);
 	/* get edid when first checked */
 	if ((connector_status_connected != msdisp_connector->status) && (connector_status_connected == status)) {
-		printk("@Perry:msdisp_drm_detect: entering EDID block\n");
+		//printk("@Perry:msdisp_drm_detect: entering EDID block\n");
 		if (msdisp_connector->edid) {
-			printk("@Perry:msdisp_drm_detect: freeing old edid ptr=%p\n", msdisp_connector->edid);
+			//printk("@Perry:msdisp_drm_detect: freeing old edid ptr=%p\n", msdisp_connector->edid);
 			kfree(msdisp_connector->edid);
 		}
 
 		msdisp_connector->edid = drm_do_get_edid(connector, msdisp_drm_get_edid_block, pipeline);
-		printk("@Perry:msdisp_drm_detect: new edid ptr=%p\n", msdisp_connector->edid);
+		//printk("@Perry:msdisp_drm_detect: new edid ptr=%p\n", msdisp_connector->edid);
 		if (!msdisp_connector->edid) {
 			DRM_ERROR("get edid failed!\n");
 			return connector_status_disconnected;
 		}
 	}
-	printk("@Perry:msdisp_drm_detect: status after EDID block: %d, edid ptr=%p\n", status, msdisp_connector->edid);
+	//printk("@Perry:msdisp_drm_detect: status after EDID block: %d, edid ptr=%p\n", status, msdisp_connector->edid);
 
     msdisp_connector->status = status;
 

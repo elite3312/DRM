@@ -402,7 +402,7 @@ static int usb_hal_dev_send_frame(struct usb_hal_dev* usb_dev, struct urb* data_
 	}
 
 	ret = usb_hal_start_wait_urb(data_urb, 2000, &snd_len);
-	printk("@Perry:usb_hal_dev_send_frame: usb_hal_start_wait_urb ret=%d, snd_len=%d\n", ret, snd_len);
+	//printk("@Perry:usb_hal_dev_send_frame: usb_hal_start_wait_urb ret=%d, snd_len=%d\n", ret, snd_len);
 	if (ret) {
 		dev_err(&udev->dev, "wait urb failed!\n ret = %d\n", ret);
 		real_ret = ret;
