@@ -21,7 +21,7 @@
 #include "usb_hal_event.h"
 #include "usb_hal_thread.h"
 #include "hal_adaptor.h"
-
+#define USE_HID_FOR_USB_TRANSFER 1
 #define CHAR_RANGE(a) (a<0?0:(a>255?255:a))
 
 struct usb_hal_api_context {
@@ -390,9 +390,24 @@ static int usb_hal_dev_send_frame(struct usb_hal_dev* usb_dev, struct urb* data_
 	mutex_unlock(&usb_dev->usb_buf.mutex);
 
 	start_time = ktime_get();
+#if USE_HID_FOR_USB_TRANSFER==1
+	if (usb_dev->udev->descriptor.idVendor == 0x1de1 && usb_dev->udev->descriptor.idProduct == 0xf201){
+		//printk("@Perry:usb_hal_dev_send_frame: use hid transfer\n");
+		usb_fill_int_urb(data_urb, udev, usb_sndintpipe(udev, ep), usb_dev->usb_buf.buf, usb_dev->usb_buf.len,
+				usb_hal_api_blocking_completion, NULL, 1);
+	}
+	else {
+		//printk("@Perry:usb_hal_dev_send_frame: use bulk transfer1\n");
+		usb_fill_bulk_urb(data_urb, udev, usb_sndbulkpipe(udev, ep), usb_dev->usb_buf.buf, usb_dev->usb_buf.len,
+				usb_hal_api_blocking_completion, NULL);
+	}
+
+#else
+	//printk("@Perry:usb_hal_dev_send_frame: use bulk transfer2\n");
 	usb_fill_bulk_urb(data_urb, udev, usb_sndbulkpipe(udev, ep), usb_dev->usb_buf.buf, usb_dev->usb_buf.len,
 			usb_hal_api_blocking_completion, NULL);
-		
+#endif	
+	printk("@Perry:usb_hal_dev_send_frame: usb_buf.type=%d\n", usb_dev->usb_buf.type);
 	if ((USB_HAL_BUF_TYPE_USB == usb_dev->usb_buf.type ) || (USB_HAL_BUF_TYPE_DMA == usb_dev->usb_buf.type)) {
 		data_urb->transfer_dma = usb_dev->usb_buf.dma_addr;
 		data_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
@@ -402,11 +417,13 @@ static int usb_hal_dev_send_frame(struct usb_hal_dev* usb_dev, struct urb* data_
 	}
 
 	ret = usb_hal_start_wait_urb(data_urb, 2000, &snd_len);
+	msleep(50);
 	//printk("@Perry:usb_hal_dev_send_frame: usb_hal_start_wait_urb ret=%d, snd_len=%d\n", ret, snd_len);
 	if (ret) {
 		dev_err(&udev->dev, "wait urb failed!\n ret = %d\n", ret);
 		real_ret = ret;
 	} else {
+		//printk("@Perry:usb_hal_dev_send_frame: send frame success, snd_len=%d\n", snd_len);
 		usb_dev->stat.send_success++;
 		
 		// Now that frame is sent successfully, update image_buf to match what we sent
@@ -434,8 +451,14 @@ static int usb_hal_dev_send_frame(struct usb_hal_dev* usb_dev, struct urb* data_
 		}
 		mutex_unlock(&usb_dev->usb_buf.mutex);
 	}
-
+#if USE_HID_FOR_USB_TRANSFER==1
+	if (usb_dev->udev->descriptor.idVendor == 0x1de1 && usb_dev->udev->descriptor.idProduct == 0xf201)
+		ret = usb_interrupt_msg(udev, usb_sndintpipe(udev, ep), zero_msg, 0, &snd_len, 2000);
+	else
+		ret = usb_bulk_msg(udev, usb_sndbulkpipe(udev, ep), zero_msg, 0, &snd_len, 2000);
+#else
     ret = usb_bulk_msg(udev, usb_sndbulkpipe(udev, ep), zero_msg, 0, &snd_len, 2000);
+#endif
     if (ret) {
         dev_err(&udev->dev, "send zero msg failed! ret=%d\n", ret);
     }
@@ -641,9 +664,20 @@ int usb_hal_state_machine_entry(void* data)
 		kfree(zero_msg);
 		return -ENOMEM;
 	}
+#if USE_HID_FOR_USB_TRANSFER==1
+    if (usb_dev->udev->descriptor.idVendor == 0x1de1 && usb_dev->udev->descriptor.idProduct == 0xf201){
 
-    ep = usb_dev->hal_dev->funcs->get_transfer_bulk_ep();
-	printk("@Perry:bulk transfer ep:0x%x\n", ep);//4
+		ep = usb_dev->hal_dev->funcs->get_transfer_hid_ep();
+		printk("@Perry:hid transfer ep:0x%x\n", ep);//1
+	}
+	else {
+		ep = usb_dev->hal_dev->funcs->get_transfer_bulk_ep();
+		printk("@Perry:bulk transfer ep:0x%x\n", ep);
+	}
+#else
+	ep = usb_dev->hal_dev->funcs->get_transfer_bulk_ep();
+	printk("@Perry:bulk transfer ep:0x%x\n", ep);
+#endif
 	/* wait for drm enable */
     while(usb_dev->thread_run_flag) {
         usb_hal_state_machine(usb_dev, data_urb, zero_msg, ep, fifo);		

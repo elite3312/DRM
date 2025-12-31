@@ -32,6 +32,7 @@
 #define MS9132_TRNAS_BULK_EP                    4
 
 #define AM8268N_TRNAS_BULK_EP                    5
+#define AM8268N_TRNAS_HID_EP                    1
 
 #define MS9132_EDID_BLOCK_LEN                   0x80
 
@@ -864,6 +865,10 @@ u8 am8268n_get_trans_bulk_ep(void)
 {
     return (u8)AM8268N_TRNAS_BULK_EP;
 }
+u8 am8268n_get_trans_hid_ep(void)
+{
+    return (u8)AM8268N_TRNAS_HID_EP;
+}
 s32 ms9132_xdata_write_byte(struct usb_device* udev, u16 addr, u8 data)
 {
     struct ms9132_hid_write_data_byte wdata;
@@ -1181,6 +1186,7 @@ const struct msdisp_hal_funcs am8268n_funcs = {
     .set_power_enable = ms9132_set_power_enable,
     .get_mode_vic = ms9132_get_mode_vic,
     .get_transfer_bulk_ep = am8268n_get_trans_bulk_ep,
+    .get_transfer_hid_ep = am8268n_get_trans_hid_ep,
     .xdata_write_byte = ms9132_xdata_write_byte,
     .xdata_read_byte = ms9132_xdata_read_byte,
     .current_frame_index = ms9132_current_frame_index,
