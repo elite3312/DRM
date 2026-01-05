@@ -32,7 +32,7 @@
 #define MS9132_TRNAS_BULK_EP                    4
 
 #define AM8268N_TRNAS_BULK_EP                    5
-#define AM8268N_TRNAS_HID_EP                    1
+#define AM8268N_TRNAS_HID_EP                    2//1
 
 #define MS9132_EDID_BLOCK_LEN                   0x80
 

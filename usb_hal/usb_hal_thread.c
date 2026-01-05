@@ -392,9 +392,9 @@ static int usb_hal_dev_send_frame_hid(struct usb_hal_dev* usb_dev, struct urb* d
 
 	//printk("@Perry:usb_hal_dev_send_frame: use bulk transfer2\n");
 	usb_fill_int_urb(data_urb, udev, usb_sndintpipe(udev, ep), usb_dev->usb_buf.buf, usb_dev->usb_buf.len,
-				usb_hal_api_blocking_completion, &ctx, 1);
+				usb_hal_api_blocking_completion,NULL, 1);
 
-	printk("@Perry:usb_hal_dev_send_frame: usb_buf.type=%d\n", usb_dev->usb_buf.type);
+	//printk("@Perry:usb_hal_dev_send_frame: usb_buf.type=%d\n", usb_dev->usb_buf.type);
 	if ((USB_HAL_BUF_TYPE_USB == usb_dev->usb_buf.type ) || (USB_HAL_BUF_TYPE_DMA == usb_dev->usb_buf.type)) {
 		data_urb->transfer_dma = usb_dev->usb_buf.dma_addr;
 		data_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
@@ -403,7 +403,7 @@ static int usb_hal_dev_send_frame_hid(struct usb_hal_dev* usb_dev, struct urb* d
 		data_urb->sg = usb_dev->usb_buf.sgt->sgl; 
 	}
 
-	ret = usb_hal_start_wait_urb(data_urb, 4000, &snd_len);
+	ret = usb_hal_start_wait_urb(data_urb, 2000, &snd_len);
 
 	msleep(50);
 	//printk("@Perry:usb_hal_dev_send_frame: usb_hal_start_wait_urb ret=%d, snd_len=%d\n", ret, snd_len);
