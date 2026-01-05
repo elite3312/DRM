@@ -29,7 +29,7 @@
 struct platform_device *msdisp_platform_dev_create(struct platform_device_info *info)
 {
 	struct platform_device *platform_dev = NULL;
-
+	printk("@Perry:msdisp_platform_dev_create() called\n");
 	platform_dev = platform_device_register_full(info);
 	if (dma_set_mask(&platform_dev->dev, DMA_BIT_MASK(64))) {
 		dev_warn(&platform_dev->dev, "Unable to change dma mask to 64 bit. ");

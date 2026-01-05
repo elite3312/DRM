@@ -46,6 +46,7 @@ struct msdisp_hal_funcs
     s32 (*set_power_enable)(struct usb_device* udev, u8 enable);
     s32 (*get_mode_vic)(u16 width, u16 height, u8 rate, u8* vic);
     u8  (*get_transfer_bulk_ep)(void);
+    u8  (*get_transfer_hid_ep)(void);
     s32 (*xdata_write_byte)(struct usb_device* udev, u16 addr, u8 data);
     s32 (*xdata_read_byte)(struct usb_device* udev, u16 addr, u8* data);
     s32 (*current_frame_index)(struct usb_device* udev, u8* index);

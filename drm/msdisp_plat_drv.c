@@ -131,7 +131,7 @@ static struct platform_device *msdisp_platform_drv_create_new_device(struct msdi
 		.size_data = 0,
 		.dma_mask = DMA_BIT_MASK(32),
 	};
-
+	printk("@Perry:msdisp_platform_drv_create_new_device() called, id=%d\n", pdevinfo.id);
 	if (pdevinfo.id < 0 || ctx->dev_count >= MSDISP_DEVICE_COUNT_MAX) {
 		printk("msdisp device add failed. Too many devices.\n");
 		return ERR_PTR(-EINVAL);
@@ -149,7 +149,7 @@ int msdisp_platform_device_add(struct device *device)
 	struct msdisp_platform_drv_context *ctx =
 		(struct msdisp_platform_drv_context *)dev_get_drvdata(device);
 	struct platform_device *pdev = NULL;
-
+	printk("@Perry:msdisp_platform_device_add() called\n");
 	msdisp_platform_drv_context_lock(ctx);
 
 	if (IS_ERR_OR_NULL(pdev))
@@ -164,6 +164,7 @@ int msdisp_platform_device_add(struct device *device)
 
 int msdisp_platform_add_devices(struct device *device, unsigned int val)
 {
+	printk("@Perry:msdisp_platform_add_devices() called, val=%u\n", val);
 	unsigned int dev_count = msdisp_platform_device_count(device);
 
 	if (val == 0) {
@@ -239,7 +240,7 @@ static int __init msdisp_init(void)
 	ret = platform_driver_register(&msdisp_platform_driver);
 	if (ret)
 		return ret;
-
+	printk("@Perry Init %s driver\n", DRIVER_NAME);
 	if (msdisp_initial_device_count)
 		return msdisp_platform_add_devices(
 			g_ctx.root_dev, msdisp_initial_device_count);
