@@ -26,7 +26,7 @@
 #include "usb_device_hid.h"
 #include "usb_hal_event.h"
 #include "usb_hal_interface.h"
-#define AM8268N_GET_EDID 0
+#define AM8268N_GET_EDID 1
 #define EDID_LENGTH                             0x80
 
 #define MS9132_TRNAS_BULK_EP                    4
@@ -604,6 +604,117 @@ s32 ms9132_get_edid(struct usb_device* udev, misctiming_t* timing, u8 detail_cou
     return ret;
 }
 
+static int send_usb_heartbeat(struct usb_device* udev)
+{
+    int ret = 0;
+    unsigned int pipe_out, pipe_in;
+    int actual_length = 0;
+    int ep = 1;  /* Use endpoint 1 */
+    /* HID report with prefix captured from a valid reply scenario */
+    unsigned char heartbeat_data[] = {
+        /* Report prefix (matches captured HID report) */
+        0x01, 0x00, 0x00, 0x00, 0x4f, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        /* JSON body: {"jsonrpc":"2.0", "method": "heartbeat", "params": {"session-id": "600406281"}} */
+        0x7b, 0x22, 0x6a, 0x73, 0x6f, 0x6e, 0x72, 0x70,
+        0x63, 0x22, 0x3a, 0x22, 0x32, 0x2e, 0x30, 0x22,
+        0x2c, 0x20, 0x22, 0x6d, 0x65, 0x74, 0x68, 0x6f,
+        0x64, 0x22, 0x3a, 0x20, 0x22, 0x68, 0x65, 0x61,
+        0x72, 0x74, 0x62, 0x65, 0x61, 0x74, 0x22, 0x2c,
+        0x20, 0x22, 0x70, 0x61, 0x72, 0x61, 0x6d, 0x73,
+        0x22, 0x3a, 0x20, 0x7b, 0x22, 0x73, 0x65, 0x73,
+        0x73, 0x69, 0x6f, 0x6e, 0x2d, 0x69, 0x64, 0x22,
+        0x3a, 0x20, 0x22, 0x36, 0x30, 0x30, 0x34, 0x30,
+        0x36, 0x32, 0x38, 0x31, 0x22, 0x7d, 0x7d
+    };
+    unsigned char *send_buf, *response_buf;
+    int heartbeat_len = sizeof(heartbeat_data);
+    int timeout_ms = 5000;
+
+    if (!udev) {
+        return -EINVAL;
+    }
+
+    /* Allocate DMA-safe buffers */
+    int padded_len = 4096;
+    send_buf = kzalloc(padded_len, GFP_KERNEL); // zero-padded
+    response_buf = kmalloc(padded_len, GFP_KERNEL);
+    if (!send_buf || !response_buf) {
+        kfree(send_buf);
+        kfree(response_buf);
+        return -ENOMEM;
+    }
+    memcpy(send_buf, heartbeat_data, heartbeat_len); // copy actual data
+    /* Fix up HID header length (bytes 4..7) to payload length in LE */
+    {
+        u32 payload_len = (heartbeat_len > 16) ? (heartbeat_len - 16) : 0;
+        send_buf[4]  = (u8)(payload_len & 0xFF);
+        send_buf[5]  = (u8)((payload_len >> 8) & 0xFF);
+        send_buf[6]  = (u8)((payload_len >> 16) & 0xFF);
+        send_buf[7]  = (u8)((payload_len >> 24) & 0xFF);
+        dev_info(&udev->dev, "HID payload_len=%u, total_len=%d, padded_len=%d\n", payload_len, heartbeat_len, padded_len);
+    }
+
+    /* Send heartbeat to endpoint 1 out (interrupt pipe) */
+    pipe_out = usb_sndintpipe(udev, ep);
+    dev_info(&udev->dev, "Sending heartbeat on EP 1 OUT, %d bytes (padded to %d)\n", heartbeat_len, padded_len);
+    /* Quick peek at header */
+    dev_info(&udev->dev, "Header: %02x %02x %02x %02x %02x %02x %02x %02x ...\n",
+        send_buf[0], send_buf[1], send_buf[2], send_buf[3],
+        send_buf[4], send_buf[5], send_buf[6], send_buf[7]);
+    ret = usb_interrupt_msg(udev, pipe_out, send_buf, padded_len, &actual_length, timeout_ms);
+    if (ret) {
+        dev_err(&udev->dev, "Failed to send heartbeat: %d\n", ret);
+        goto out;
+    }
+    dev_info(&udev->dev, "Heartbeat sent successfully: %d bytes\n", actual_length);
+    msleep(100);
+    
+    /* Wait for response from endpoint 1 in (interrupt pipe) */
+    pipe_in = usb_rcvintpipe(udev, ep);
+    actual_length = 0;
+    dev_info(&udev->dev, "Waiting for response on EP 1 IN with timeout %d ms\n", 3000);
+    ret = usb_interrupt_msg(udev, pipe_in, response_buf, 512, &actual_length, 3000);
+    if (ret) {
+        dev_err(&udev->dev, "Failed to receive heartbeat response: %d\n", ret);
+        goto out;
+    }
+
+    /* Print the response */
+    dev_info(&udev->dev, "Heartbeat response received: %d bytes\n", actual_length);
+    if (actual_length > 0) {
+        int i, j;
+        char line[16 * 3 + 1];
+        char asciis[16 + 1];
+        dev_info(&udev->dev, "Response (hex):");
+        for (i = 0; i < actual_length; i += 16) {
+            int linelen = (actual_length - i > 16) ? 16 : (actual_length - i);
+            for (j = 0; j < linelen; ++j) {
+                sprintf(&line[j * 3], "%02x ", response_buf[i + j]);
+                asciis[j] = (response_buf[i + j] >= 32 && response_buf[i + j] < 127) ? response_buf[i + j] : '.';
+            }
+            line[linelen * 3] = '\0';
+            asciis[linelen] = '\0';
+            printk("%04x: %-48s |%s|\n", i, line, asciis);
+        }
+        /* Print as ASCII (all on one line, up to padded_len chars) */
+        
+        for (i = 0; i < actual_length && i < padded_len; ++i) {
+            asciis[i % 16] = (response_buf[i] >= 32 && response_buf[i] < 127) ? response_buf[i] : '.';
+            if ((i % 16) == 15 || i == actual_length - 1 || i == padded_len - 1) {
+                asciis[(i % 16) + 1] = '\0';
+                printk("%s", asciis);
+            }
+        }
+        printk("\n");
+    }
+
+out:
+    kfree(send_buf);
+    kfree(response_buf);
+    return ret;
+}
+
 s32 am8268n_get_edid(struct usb_device* udev, misctiming_t* timing, u8 detail_count, 
     u8 chip_id, u8 port_type, u8 sdram_type, u8 block, u8* buf, u32 len)
 {
@@ -641,7 +752,7 @@ s32 am8268n_get_edid(struct usb_device* udev, misctiming_t* timing, u8 detail_co
 #if AM8268N_GET_EDID==1
             //send json to 8268
             //await for edid response
-            //send_jsonrpc_data_passthrough(udev);
+            send_usb_heartbeat(udev);
 #else
             // Hardcode EDID workaround for specific device if read fails
             if (block == 0 && len >= 128) {
