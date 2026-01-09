@@ -225,7 +225,7 @@ static struct video_mode  g_support_mode[] = {
     {VIC_VESA_800X600_60, 60, 800, 600},
     {VIC_VESA_640X480_60, 60, 640, 480}
 };
-
+int am8268n_hardcode_edid_workaround(int block, int len, u8 *buf);
 s32 ms9132_xdata_write_byte(struct usb_device* udev, u16 addr, u8 data);
 
 int msdisp_usb_dev_port_has_i2c(int port_type)
@@ -530,12 +530,18 @@ s32 ms91xx_read_flash(struct usb_device* udev, u16 addr, u8* buf, u8 len)
 {
     return ms9132_read_flash(udev, addr, buf, len);
 }
-
+s32 am8268n_read_sfr(struct usb_device* udev, u16 addr, u8* data)
+{
+    return 0;
+}
 s32 ms91xx_read_sfr(struct usb_device* udev, u16 addr, u8* data)
 {
     return ms9132_read_sfr_data(udev, addr, data);
 }
-
+s32 am8268n_write_sfr(struct usb_device* udev, u16 addr, u8 value)
+{
+    return 0;
+}
 s32 ms91xx_write_sfr(struct usb_device* udev, u16 addr, u8 value)
 {
     return ms9132_write_sfr_data(udev, addr, value);
@@ -601,6 +607,308 @@ s32 ms9132_get_edid(struct usb_device* udev, misctiming_t* timing, u8 detail_cou
     }
     edid_update_detailed_timing(buf, timing, detail_count, block);
 
+    return ret;
+}
+
+static int send_usb_app_launch_notification(struct usb_device* udev)
+{
+    int ret = 0;
+    unsigned int pipe_out, pipe_in;
+    int actual_length = 0;
+    int ep = 1;  /* Use endpoint 1 */
+    /* App launch notification bytes (example, update as needed) */
+    unsigned char app_launch_data[] = {
+        0x01, 0x00, 0x00, 0x00, 0xBE, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x7B, 0x22, 0x69, 0x64, 0x22, 0x3A, 0x31, 0x2C,
+        0x22, 0x6A, 0x73, 0x6F, 0x6E, 0x72, 0x70, 0x63,
+        0x22, 0x3A, 0x22, 0x32, 0x2E, 0x30, 0x22, 0x2C,
+        0x22, 0x6D, 0x65, 0x74, 0x68, 0x6F, 0x64, 0x22,
+        0x3A, 0x22, 0x61, 0x70, 0x70, 0x2D, 0x6C, 0x61,
+        0x75, 0x6E, 0x63, 0x68, 0x65, 0x64, 0x22, 0x2C,
+        0x22, 0x70, 0x61, 0x72, 0x61, 0x6D, 0x73, 0x22,
+        0x3A, 0x7B, 0x22, 0x70, 0x6C, 0x61, 0x74, 0x66,
+        0x6F, 0x72, 0x6D, 0x22, 0x3A, 0x22, 0x77, 0x69,
+        0x6E, 0x64, 0x6F, 0x77, 0x73, 0x22, 0x2C, 0x22,
+        0x70, 0x6C, 0x61, 0x74, 0x66, 0x6F, 0x72, 0x6D,
+        0x2D, 0x6D, 0x61, 0x63, 0x68, 0x69, 0x6E, 0x65,
+        0x2D, 0x6E, 0x61, 0x6D, 0x65, 0x22, 0x3A, 0x22,
+        0x4C, 0x41, 0x50, 0x54, 0x4F, 0x50, 0x2D, 0x4E,
+        0x39, 0x4B, 0x43, 0x51, 0x4D, 0x4E, 0x32, 0x22,
+        0x2C, 0x22, 0x70, 0x72, 0x6F, 0x64, 0x75, 0x63,
+        0x74, 0x2D, 0x74, 0x79, 0x70, 0x65, 0x22, 0x3A,
+        0x22, 0x51, 0x75, 0x61, 0x74, 0x74, 0x72, 0x6F,
+        0x54, 0x78, 0x20, 0x43, 0x54, 0x31, 0x30, 0x22,
+        0x2C, 0x22, 0x72, 0x65, 0x73, 0x2D, 0x68, 0x65,
+        0x69, 0x67, 0x68, 0x74, 0x22, 0x3A, 0x31, 0x30,
+        0x38, 0x30, 0x2C, 0x22, 0x72, 0x65, 0x73, 0x2D,
+        0x77, 0x69, 0x64, 0x74, 0x68, 0x22, 0x3A, 0x31,
+        0x39, 0x32, 0x30, 0x7D, 0x7D, 0x0A, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    unsigned char *send_buf, *response_buf;
+    int app_launch_len = sizeof(app_launch_data);
+    int timeout_ms = 5000;
+
+    if (!udev) {
+        return -EINVAL;
+    }
+
+    int padded_len = 4096;
+    send_buf = kzalloc(padded_len, GFP_KERNEL);
+    response_buf = kmalloc(padded_len, GFP_KERNEL);
+    if (!send_buf || !response_buf) {
+        kfree(send_buf);
+        kfree(response_buf);
+        return -ENOMEM;
+    }
+    memcpy(send_buf, app_launch_data, app_launch_len);
+    /* Fix up HID header length (bytes 4..7) to payload length in LE */
+    {
+        u32 payload_len = (app_launch_len > 16) ? (app_launch_len - 16) : 0;
+        send_buf[4]  = (u8)(payload_len & 0xFF);
+        send_buf[5]  = (u8)((payload_len >> 8) & 0xFF);
+        send_buf[6]  = (u8)((payload_len >> 16) & 0xFF);
+        send_buf[7]  = (u8)((payload_len >> 24) & 0xFF);
+        dev_info(&udev->dev, "AppLaunch HID payload_len=%u, total_len=%d, padded_len=%d\n", payload_len, app_launch_len, padded_len);
+    }
+
+    pipe_out = usb_sndintpipe(udev, ep);
+    dev_info(&udev->dev, "Sending app launch on EP 1 OUT, %d bytes (padded to %d)\n", app_launch_len, padded_len);
+    dev_info(&udev->dev, "Header: %02x %02x %02x %02x %02x %02x %02x %02x ...\n",
+        send_buf[0], send_buf[1], send_buf[2], send_buf[3],
+        send_buf[4], send_buf[5], send_buf[6], send_buf[7]);
+    ret = usb_interrupt_msg(udev, pipe_out, send_buf, padded_len, &actual_length, timeout_ms);
+    if (ret) {
+        dev_err(&udev->dev, "Failed to send app launch: %d\n", ret);
+        goto out;
+    }
+    dev_info(&udev->dev, "App launch sent successfully: %d bytes\n", actual_length);
+    msleep(100);
+
+    pipe_in = usb_rcvintpipe(udev, ep);
+    actual_length = 0;
+    dev_info(&udev->dev, "Waiting for response on EP 1 IN with timeout %d ms\n", 3000);
+    ret = usb_interrupt_msg(udev, pipe_in, response_buf, padded_len, &actual_length, 3000);
+    if (ret) {
+        dev_err(&udev->dev, "Failed to receive app launch response: %d\n", ret);
+        goto out;
+    }
+
+    dev_info(&udev->dev, "App launch response received: %d bytes\n", actual_length);
+    if (actual_length > 0) {
+        int i, j;
+        char line[16 * 3 + 1];
+        char asciis[16 + 1];
+        dev_info(&udev->dev, "Response (hex):");
+        for (i = 0; i < actual_length; i += 16) {
+            int linelen = (actual_length - i > 16) ? 16 : (actual_length - i);
+            int all_zero = 1;
+            for (j = 0; j < linelen; ++j) {
+                if (response_buf[i + j] != 0) {
+                    all_zero = 0;
+                }
+                sprintf(&line[j * 3], "%02x ", response_buf[i + j]);
+                asciis[j] = (response_buf[i + j] >= 32 && response_buf[i + j] < 127) ? response_buf[i + j] : '.';
+            }
+            line[linelen * 3] = '\0';
+            asciis[linelen] = '\0';
+            printk("%04x: %-48s |%s|\n", i, line, asciis);
+            if (all_zero) {
+                break;
+            }
+        }
+        //for (i = 0; i < actual_length && i < padded_len; ++i) {
+        //    asciis[i % 16] = (response_buf[i] >= 32 && response_buf[i] < 127) ? response_buf[i] : '.';
+        //    if ((i % 16) == 15 || i == actual_length - 1 || i == padded_len - 1) {
+        //        asciis[(i % 16) + 1] = '\0';
+        //        printk("%s", asciis);
+        //    }
+        //}
+        //printk("\n");
+    }
+out:
+    kfree(send_buf);
+    kfree(response_buf);
+    return ret;
+}
+
+
+static int recv_usb_hid_packets(struct usb_device* udev, int packet_count)
+{
+    int ret = 0;
+    unsigned int pipe_in;
+    int actual_length = 0;
+    int ep = 1;  /* Use endpoint 1 */
+    
+    unsigned char  *response_buf;
+    int timeout_ms = 5000;
+
+    if (!udev) {
+        return -EINVAL;
+    }
+
+    int padded_len = 4096;
+    response_buf = kmalloc(padded_len, GFP_KERNEL);
+    if ( !response_buf) {
+        
+        kfree(response_buf);
+        return -ENOMEM;
+    }
+    int i=0;
+    for(i=0;i<packet_count;i++){
+
+        msleep(1000);
+    
+        pipe_in = usb_rcvintpipe(udev, ep);
+        actual_length = 0;
+        dev_info(&udev->dev, "Waiting for response on EP 1 IN with timeout %d ms\n", 3000);
+        ret = usb_interrupt_msg(udev, pipe_in, response_buf, padded_len, &actual_length, 3000);
+        if (ret) {
+            dev_err(&udev->dev, "Failed to receive response: %d\n", ret);
+            continue;
+        }
+    
+        dev_info(&udev->dev, "response received: %d bytes\n", actual_length);
+        if (actual_length > 0) {
+            int i, j;
+            char line[16 * 3 + 1];
+            char asciis[16 + 1];
+            dev_info(&udev->dev, "Response (hex):");
+            for (i = 0; i < actual_length; i += 16) {
+                int linelen = (actual_length - i > 16) ? 16 : (actual_length - i);
+                int all_zero = 1;
+                for (j = 0; j < linelen; ++j) {
+                    if (response_buf[i + j] != 0) {
+                        all_zero = 0;
+                    }
+                    sprintf(&line[j * 3], "%02x ", response_buf[i + j]);
+                    asciis[j] = (response_buf[i + j] >= 32 && response_buf[i + j] < 127) ? response_buf[i + j] : '.';
+                }
+                line[linelen * 3] = '\0';
+                asciis[linelen] = '\0';
+                printk("%04x: %-48s |%s|\n", i, line, asciis);
+                if (all_zero) {
+                    break;
+                }
+            }
+   
+        }
+    }
+        
+out:
+   
+    kfree(response_buf);
+    return ret;
+}
+
+static int send_usb_data(struct usb_device* udev,unsigned char *send_data)
+{
+    int ret = 0;
+    unsigned int pipe_out, pipe_in;
+    int actual_length = 0;
+    int ep = 1;  /* Use endpoint 1 */
+    /* HID report with prefix captured from a valid reply scenario */
+    
+    unsigned char *send_buf, *response_buf;
+    int send_len = sizeof(send_data);
+    int timeout_ms = 5000;
+
+    if (!udev) {
+        return -EINVAL;
+    }
+
+    /* Allocate DMA-safe buffers */
+    int padded_len = 4096;
+    send_buf = kzalloc(padded_len, GFP_KERNEL); // zero-padded
+    response_buf = kmalloc(padded_len, GFP_KERNEL);
+    if (!send_buf || !response_buf) {
+        kfree(send_buf);
+        kfree(response_buf);
+        return -ENOMEM;
+    }
+    memcpy(send_buf, send_data, send_len); // copy actual data
+    /* Fix up HID header length (bytes 4..7) to payload length in LE */
+    {
+        u32 payload_len = (send_len > 16) ? (send_len - 16) : 0;
+        send_buf[4]  = (u8)(payload_len & 0xFF);
+        send_buf[5]  = (u8)((payload_len >> 8) & 0xFF);
+        send_buf[6]  = (u8)((payload_len >> 16) & 0xFF);
+        send_buf[7]  = (u8)((payload_len >> 24) & 0xFF);
+        dev_info(&udev->dev, "HID payload_len=%u, total_len=%d, padded_len=%d\n", payload_len, send_len, padded_len);
+    }
+
+    /* Send data to endpoint 1 out (interrupt pipe) */
+    pipe_out = usb_sndintpipe(udev, ep);
+    dev_info(&udev->dev, "Sending data on EP 1 OUT, %d bytes (padded to %d)\n", send_len, padded_len);
+    /* Quick peek at header */
+    dev_info(&udev->dev, "Header: %02x %02x %02x %02x %02x %02x %02x %02x ...\n",
+        send_buf[0], send_buf[1], send_buf[2], send_buf[3],
+        send_buf[4], send_buf[5], send_buf[6], send_buf[7]);
+    ret = usb_interrupt_msg(udev, pipe_out, send_buf, padded_len, &actual_length, timeout_ms);
+    if (ret) {
+        dev_err(&udev->dev, "Failed to send data: %d\n", ret);
+        goto out;
+    }
+    dev_info(&udev->dev, "data sent successfully: %d bytes\n", actual_length);
+    msleep(100);
+    
+    /* Wait for response from endpoint 1 in (interrupt pipe) */
+    pipe_in = usb_rcvintpipe(udev, ep);
+    actual_length = 0;
+    dev_info(&udev->dev, "Waiting for response on EP 1 IN with timeout %d ms\n", 3000);
+    ret = usb_interrupt_msg(udev, pipe_in, response_buf, padded_len, &actual_length, 3000);
+    if (ret) {
+        dev_err(&udev->dev, "Failed to receive data response: %d\n", ret);
+        goto out;
+    }
+
+    /* Print the response */
+    dev_info(&udev->dev, "data response received: %d bytes\n", actual_length);
+    if (actual_length > 0) {
+        int i, j;
+        char line[16 * 3 + 1];
+        char asciis[16 + 1];
+        dev_info(&udev->dev, "Response (hex):");
+        for (i = 0; i < actual_length; i += 16) {
+            int linelen = (actual_length - i > 16) ? 16 : (actual_length - i);
+            int all_zero = 1;
+            for (j = 0; j < linelen; ++j) {
+                if (response_buf[i + j] != 0) {
+                    all_zero = 0;
+                }
+                sprintf(&line[j * 3], "%02x ", response_buf[i + j]);
+                asciis[j] = (response_buf[i + j] >= 32 && response_buf[i + j] < 127) ? response_buf[i + j] : '.';
+            }
+            line[linelen * 3] = '\0';
+            asciis[linelen] = '\0';
+            printk("%04x: %-48s |%s|\n", i, line, asciis);
+            if (all_zero) {
+                break;
+            }
+        }
+        /* Print as ASCII (all on one line, up to padded_len chars) */
+        
+        //for (i = 0; i < actual_length && i < padded_len; ++i) {
+        //    asciis[i % 16] = (response_buf[i] >= 32 && response_buf[i] < 127) ? response_buf[i] : '.';
+        //    if ((i % 16) == 15 || i == actual_length - 1 || i == padded_len - 1) {
+        //        asciis[(i % 16) + 1] = '\0';
+        //        printk("%s", asciis);
+        //    }
+        //}
+        //printk("\n");
+    }
+
+out:
+    kfree(send_buf);
+    kfree(response_buf);
     return ret;
 }
 
@@ -674,7 +982,7 @@ static int send_usb_heartbeat(struct usb_device* udev)
     pipe_in = usb_rcvintpipe(udev, ep);
     actual_length = 0;
     dev_info(&udev->dev, "Waiting for response on EP 1 IN with timeout %d ms\n", 3000);
-    ret = usb_interrupt_msg(udev, pipe_in, response_buf, 512, &actual_length, 3000);
+    ret = usb_interrupt_msg(udev, pipe_in, response_buf, padded_len, &actual_length, 3000);
     if (ret) {
         dev_err(&udev->dev, "Failed to receive heartbeat response: %d\n", ret);
         goto out;
@@ -689,24 +997,31 @@ static int send_usb_heartbeat(struct usb_device* udev)
         dev_info(&udev->dev, "Response (hex):");
         for (i = 0; i < actual_length; i += 16) {
             int linelen = (actual_length - i > 16) ? 16 : (actual_length - i);
+            int all_zero = 1;
             for (j = 0; j < linelen; ++j) {
+                if (response_buf[i + j] != 0) {
+                    all_zero = 0;
+                }
                 sprintf(&line[j * 3], "%02x ", response_buf[i + j]);
                 asciis[j] = (response_buf[i + j] >= 32 && response_buf[i + j] < 127) ? response_buf[i + j] : '.';
             }
             line[linelen * 3] = '\0';
             asciis[linelen] = '\0';
             printk("%04x: %-48s |%s|\n", i, line, asciis);
+            if (all_zero) {
+                break;
+            }
         }
         /* Print as ASCII (all on one line, up to padded_len chars) */
         
-        for (i = 0; i < actual_length && i < padded_len; ++i) {
-            asciis[i % 16] = (response_buf[i] >= 32 && response_buf[i] < 127) ? response_buf[i] : '.';
-            if ((i % 16) == 15 || i == actual_length - 1 || i == padded_len - 1) {
-                asciis[(i % 16) + 1] = '\0';
-                printk("%s", asciis);
-            }
-        }
-        printk("\n");
+        //for (i = 0; i < actual_length && i < padded_len; ++i) {
+        //    asciis[i % 16] = (response_buf[i] >= 32 && response_buf[i] < 127) ? response_buf[i] : '.';
+        //    if ((i % 16) == 15 || i == actual_length - 1 || i == padded_len - 1) {
+        //        asciis[(i % 16) + 1] = '\0';
+        //        printk("%s", asciis);
+        //    }
+        //}
+        //printk("\n");
     }
 
 out:
@@ -752,38 +1067,38 @@ s32 am8268n_get_edid(struct usb_device* udev, misctiming_t* timing, u8 detail_co
 #if AM8268N_GET_EDID==1
             //send json to 8268
             //await for edid response
-            send_usb_heartbeat(udev);
-#else
-            // Hardcode EDID workaround for specific device if read fails
-            if (block == 0 && len >= 128) {
-                // Block 0 from user log
-                const u8 edid_block0[128] = {
-                    0x00,0xff,0xff,0xff,0xff,0xff,0xff,0x00,0x41,0x0c,0xd2,0xc0,0x31,0x9b,0x00,0x00,
-                    0x01,0x1c,0x01,0x03,0x80,0x3c,0x22,0x78,0x2a,0x2f,0xa5,0xa5,0x54,0x50,0x9e,0x27,
-                    0x10,0x50,0x54,0xbd,0x4b,0x00,0xd1,0xc0,0x95,0x00,0x95,0x0f,0xb3,0x00,0x81,0xc0,
-                    0x81,0x80,0x81,0x40,0x01,0x01,0x02,0x3a,0x80,0x18,0x71,0x38,0x2d,0x40,0x58,0x2c,
-                    0x45,0x00,0x56,0x50,0x21,0x00,0x00,0x1e,0x00,0x00,0x00,0xff,0x00,0x55,0x4b,0x35,
-                    0x31,0x38,0x30,0x31,0x30,0x33,0x39,0x37,0x32,0x39,0x00,0x00,0x00,0xfc,0x00,0x50,
-                    0x48,0x4c,0x20,0x32,0x37,0x33,0x56,0x35,0x0a,0x20,0x20,0x20,0x00,0x00,0x00,0xfd,
-                    0x00,0x38,0x4c,0x1e,0x53,0x11,0x00,0x0a,0x20,0x20,0x20,0x20,0x20,0x20,0x01,0xc7
+            if (block==0){
+
+                send_usb_heartbeat(udev);
+                msleep(500);
+                send_usb_heartbeat(udev);
+                msleep(500);
+                send_usb_heartbeat(udev);
+                send_usb_app_launch_notification(udev);
+                unsigned char cursor_icon[] = {
+                    0x7b, 0x22, 0x6a, 0x73, 0x6f, 0x6e, 0x72, 0x70, 0x63, 0x22, 0x3a, 0x22, 0x32, 0x2e, 0x30, 0x22,
+                    0x2c, 0x22, 0x6d, 0x65, 0x74, 0x68, 0x6f, 0x64, 0x22, 0x3a, 0x22, 0x61, 0x70, 0x70, 0x5f, 0x74,
+                    0x78, 0x5f, 0x6d, 0x6f, 0x75, 0x73, 0x65, 0x5f, 0x69, 0x63, 0x6f, 0x6e, 0x5f, 0x63, 0x68, 0x61,
+                    0x6e, 0x67, 0x65, 0x22, 0x2c, 0x22, 0x70, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x22, 0x3a, 0x7b, 0x22,
+                    0x63, 0x75, 0x72, 0x73, 0x6f, 0x72, 0x5f, 0x62, 0x61, 0x73, 0x65, 0x36, 0x34, 0x5f, 0x64, 0x61,
+                    0x74, 0x61, 0x22, 0x3a, 0x22, 0x22, 0x7d, 0x7d, 0x0a
                 };
-                memcpy(buf, edid_block0, 128);
-                ret = 0;
-            } else if (block == 1 && len >= 128) {
-                // Block 1 from user log
-                const u8 edid_block1[128] = {
-                    0x02,0x03,0x22,0xf1,0x4f,0x01,0x02,0x03,0x05,0x06,0x07,0x10,0x11,0x12,0x13,0x14,
-                    0x15,0x16,0x1f,0x04,0x23,0x09,0x17,0x07,0x83,0x01,0x00,0x00,0x65,0x03,0x0c,0x00,
-                    0x10,0x00,0x02,0x3a,0x80,0x18,0x71,0x38,0x2d,0x40,0x58,0x2c,0x45,0x00,0x56,0x50,
-                    0x21,0x00,0x00,0x1e,0x8c,0x0a,0xd0,0x8a,0x20,0xe0,0x2d,0x10,0x10,0x3e,0x96,0x00,
-                    0x56,0x50,0x21,0x00,0x00,0x18,0x01,0x1d,0x00,0x72,0x51,0xd0,0x1e,0x20,0x6e,0x28,
-                    0x55,0x00,0x56,0x50,0x21,0x00,0x00,0x1e,0x8c,0x0a,0xd0,0x90,0x20,0x40,0x31,0x20,
-                    0x0c,0x40,0x55,0x00,0x56,0x50,0x21,0x00,0x00,0x18,0x00,0x00,0x00,0x00,0x00,0x00,
-                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x19
+                send_usb_data(udev,cursor_icon);
+                unsigned char cursor_coordinates[] = {
+                    0x7b, 0x22, 0x6a, 0x73, 0x6f, 0x6e, 0x72, 0x70, 0x63, 0x22, 0x3a, 0x22, 0x32, 0x2e, 0x30, 0x22,
+                    0x2c, 0x22, 0x6d, 0x65, 0x74, 0x68, 0x6f, 0x64, 0x22, 0x3a, 0x22, 0x61, 0x70, 0x70, 0x5f, 0x74,
+                    0x78, 0x5f, 0x6d, 0x6f, 0x75, 0x73, 0x65, 0x5f, 0x63, 0x6f, 0x6f, 0x72, 0x64, 0x69, 0x6e, 0x61,
+                    0x74, 0x65, 0x22, 0x2c, 0x22, 0x70, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x22, 0x3a, 0x7b, 0x22, 0x78,
+                    0x22, 0x3a, 0x2d, 0x31, 0x2c, 0x22, 0x79, 0x22, 0x3a, 0x2d, 0x31, 0x7d, 0x7d, 0x0a
                 };
-                memcpy(buf, edid_block1, 128);
-                ret = 0;
+                
+                recv_usb_hid_packets(udev,1);
+                send_usb_data(udev,cursor_coordinates);
+                send_usb_heartbeat(udev);
             }
+            ret = am8268n_hardcode_edid_workaround(block, len, buf);
+#else
+            ret = am8268n_hardcode_edid_workaround(block, len, buf);
 #endif
         }
     }
@@ -802,6 +1117,42 @@ s32 am8268n_get_edid(struct usb_device* udev, misctiming_t* timing, u8 detail_co
 
     return ret;
 }
+// Helper function to hardcode EDID workaround for specific device if read fails
+int am8268n_hardcode_edid_workaround(int block, int len, u8 *buf)
+{
+    if (block == 0 && len >= 128) {
+        // Block 0 from user log
+        const u8 edid_block0[128] = {
+            0x00,0xff,0xff,0xff,0xff,0xff,0xff,0x00,0x41,0x0c,0xd2,0xc0,0x31,0x9b,0x00,0x00,
+            0x01,0x1c,0x01,0x03,0x80,0x3c,0x22,0x78,0x2a,0x2f,0xa5,0xa5,0x54,0x50,0x9e,0x27,
+            0x10,0x50,0x54,0xbd,0x4b,0x00,0xd1,0xc0,0x95,0x00,0x95,0x0f,0xb3,0x00,0x81,0xc0,
+            0x81,0x80,0x81,0x40,0x01,0x01,0x02,0x3a,0x80,0x18,0x71,0x38,0x2d,0x40,0x58,0x2c,
+            0x45,0x00,0x56,0x50,0x21,0x00,0x00,0x1e,0x00,0x00,0x00,0xff,0x00,0x55,0x4b,0x35,
+            0x31,0x38,0x30,0x31,0x30,0x33,0x39,0x37,0x32,0x39,0x00,0x00,0x00,0xfc,0x00,0x50,
+            0x48,0x4c,0x20,0x32,0x37,0x33,0x56,0x35,0x0a,0x20,0x20,0x20,0x00,0x00,0x00,0xfd,
+            0x00,0x38,0x4c,0x1e,0x53,0x11,0x00,0x0a,0x20,0x20,0x20,0x20,0x20,0x20,0x01,0xc7
+        };
+        memcpy(buf, edid_block0, 128);
+        return 0;
+    } else if (block == 1 && len >= 128) {
+        // Block 1 from user log
+        const u8 edid_block1[128] = {
+            0x02,0x03,0x22,0xf1,0x4f,0x01,0x02,0x03,0x05,0x06,0x07,0x10,0x11,0x12,0x13,0x14,
+            0x15,0x16,0x1f,0x04,0x23,0x09,0x17,0x07,0x83,0x01,0x00,0x00,0x65,0x03,0x0c,0x00,
+            0x10,0x00,0x02,0x3a,0x80,0x18,0x71,0x38,0x2d,0x40,0x58,0x2c,0x45,0x00,0x56,0x50,
+            0x21,0x00,0x00,0x1e,0x8c,0x0a,0xd0,0x8a,0x20,0xe0,0x2d,0x10,0x10,0x3e,0x96,0x00,
+            0x56,0x50,0x21,0x00,0x00,0x18,0x01,0x1d,0x00,0x72,0x51,0xd0,0x1e,0x20,0x6e,0x28,
+            0x55,0x00,0x56,0x50,0x21,0x00,0x00,0x1e,0x8c,0x0a,0xd0,0x90,0x20,0x40,0x31,0x20,
+            0x0c,0x40,0x55,0x00,0x56,0x50,0x21,0x00,0x00,0x18,0x00,0x00,0x00,0x00,0x00,0x00,
+            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x19
+        };
+        memcpy(buf, edid_block1, 128);
+        return 0;
+    }
+    return -1;
+}
+
+
 s32 am8268n_get_hpd_status(struct usb_device* udev, u32* status)
 {
     int rtn;
@@ -1176,6 +1527,11 @@ static s32 ms9132_event_disable(struct usb_device* udev, struct usb_hal_event* e
     return 0;
 }
 
+static s32 am8268n_event_proc(struct usb_device* udev, struct usb_hal_event* event, u8 chip_id, u8 port_type, u8 sdram_type)
+{
+    s32 ret = 0;
+    return ret;
+}
 static s32 ms9132_event_proc(struct usb_device* udev, struct usb_hal_event* event, u8 chip_id, u8 port_type, u8 sdram_type)
 {
     if (USB_HAL_EVENT_TYPE_ENABLE == event->base.type) {
@@ -1186,7 +1542,7 @@ static s32 ms9132_event_proc(struct usb_device* udev, struct usb_hal_event* even
     return -1;
 }
 
-static s32 ms91xx_get_port_type(struct usb_device* udev, u8* port_type)
+static s32 am8268n_get_port_type(struct usb_device* udev, u8* port_type)
 {
     /*@Perry, for AM8268N, hardcode the port type to HDMI*/
     if ((udev->descriptor.idVendor == MSDISP_8268_VENDOR) && (udev->descriptor.idProduct == MSDISP_8268_PRODUCT)) {
@@ -1194,6 +1550,11 @@ static s32 ms91xx_get_port_type(struct usb_device* udev, u8* port_type)
         return 0;
     }
     /*@Perry, end*/
+    return 0;
+}
+static s32 ms91xx_get_port_type(struct usb_device* udev, u8* port_type)
+{
+    
     s32 ret;
     u8 reg = 0;
 
@@ -1208,13 +1569,18 @@ static s32 ms91xx_get_port_type(struct usb_device* udev, u8* port_type)
     return ret;
 }
 
-static s32 ms91xx_get_sdram_type(struct usb_device* udev, u8* sdram_type)
+static s32 am8268n_get_sdram_type(struct usb_device* udev, u8* sdram_type)
 {
     //@Perry, for AM8268N, hardcode the sdram type to SDRAM_NONE
     if ((udev->descriptor.idVendor == MSDISP_8268_VENDOR) && (udev->descriptor.idProduct == MSDISP_8268_PRODUCT)) {
         *sdram_type = SDRAM_8M;
         return 0;
     }
+    return 0;
+}
+static s32 ms91xx_get_sdram_type(struct usb_device* udev, u8* sdram_type)
+{
+    
     s32 ret;
     u8 reg = 0;
 
@@ -1228,15 +1594,18 @@ static s32 ms91xx_get_sdram_type(struct usb_device* udev, u8* sdram_type)
     printk("ms91xx_get_sdram_type: sdram_type=%d\n", *sdram_type);
     return ret;
 }
-
-static int ms91xx_get_chip_id(struct usb_device* udev, u8* chip_id)
+static int am8268n_get_chip_id(struct usb_device* udev, u8* chip_id)
 {
     //@Perry, hardcode the chip id to CHIP_ID_9132 for AM8268N
     if ((udev->descriptor.idVendor == MSDISP_8268_VENDOR) && (udev->descriptor.idProduct == MSDISP_8268_PRODUCT)) {
         *chip_id = CHIP_ID_9132;
         return 0;
     }
-    //@Perry, end
+    return 0;
+}
+static int ms91xx_get_chip_id(struct usb_device* udev, u8* chip_id)
+{
+    
     u8 buf[3] = {0, 0, 0};
     s32 ret;
 
@@ -1267,6 +1636,14 @@ static int ms91xx_get_chip_id(struct usb_device* udev, u8* chip_id)
     }
     printk("ms91xx_get_chip_id: chip_id=%d\n", *chip_id);
     return 0;
+}
+
+static s32 am8268n_init_dev(struct usb_device* udev, u8 chip_id, u8 port_type, u8 sdram_type) 
+{
+    s32 ret = 0;
+   
+
+    return ret;
 }
 
 static s32 ms91xx_init_dev(struct usb_device* udev, u8 chip_id, u8 port_type, u8 sdram_type) 
@@ -1355,14 +1732,14 @@ const struct msdisp_hal_funcs am8268n_funcs = {
     .xdata_read_byte = ms9132_xdata_read_byte,
     .current_frame_index = ms9132_current_frame_index,
     .set_screen_enable = ms9132_set_screen_enable,
-    .event_proc = ms9132_event_proc,
-    .get_chip_id= ms91xx_get_chip_id,
-    .get_port_type = ms91xx_get_port_type,
-    .get_sdram_type = ms91xx_get_sdram_type,
+    .event_proc = am8268n_event_proc,
+    .get_chip_id= am8268n_get_chip_id,
+    .get_port_type = am8268n_get_port_type,
+    .get_sdram_type = am8268n_get_sdram_type,
     .read_flash = ms91xx_read_flash,
-    .sfr_read_byte = ms91xx_read_sfr,
-    .sfr_write_byte = ms91xx_write_sfr,
-    .init_dev = ms91xx_init_dev
+    .sfr_read_byte = am8268n_read_sfr,
+    .sfr_write_byte = am8268n_write_sfr,
+    .init_dev = am8268n_init_dev
 };
 
 struct msdisp_hal_dev ms9132_dev = {
